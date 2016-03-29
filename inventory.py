@@ -62,8 +62,7 @@ def create_schedule(n_days=25):
     tote_is_purchased = Variable(n_totes, n_days)
 
     objective = Minimize(production.T*labor_costs
-                         + inventory.T*storage_costs
-                         + totes.T*cost_of_storing_tote)
+                         + inventory.T*storage_costs)
 
     # Conservation of inventory equation
     D1 = first_deriv_matrix(n_days)
@@ -87,7 +86,7 @@ def create_schedule(n_days=25):
     if problem.status == 'infeasible':
         return
 
-
+    print 'plotting'
     #make plots
     plt.plot(days, production.value, label='production', marker='o')
     plt.plot(days, inventory.value, label='inventory')
@@ -95,7 +94,8 @@ def create_schedule(n_days=25):
     plt.xlabel('Day')
     plt.title('Production Schedule: One product')
     plt.legend()
+    plt.show()
 
-
-
-
+if __name__ == "__main__":
+    print 'close window to finish'
+    create_schedule()
