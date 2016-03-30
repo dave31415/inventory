@@ -20,6 +20,10 @@ except ImportError:
 
 
 def create_default_params():
+    """
+    Create the default parameters for the demo
+    :return: dictionary of all parameters needed
+    """
     params = {'n_days': 80,
               'labor_cost': 1.0,
               'labor_cost_extra_weekend': 0.5,
@@ -45,7 +49,7 @@ def create_sales(days, pars):
     """
     Create simulated sales
     that are ramping up but saturate and have weekday
-    dependence and some (pseudo) randomness
+    dependence and some (pseudo) randomness on top
     :param days: index of days
     :param pars: parameters, e.g. from create_default_params
     :return: numpy array of sales for each day
@@ -55,6 +59,7 @@ def create_sales(days, pars):
     sales = np.repeat(pars['sales_base'], pars['n_days']) \
         + weekday_sales[weekday] * pars['ramp']*days
     sales = np.array([min(sale, pars['sales_max']) for sale in sales])
+    np.random.seed(pars['sales_random_seed'])
     sales += np.random.randn(pars['n_days'])*pars['sales_sigma']
     sales[sales < 0] = 0.0
     return sales
