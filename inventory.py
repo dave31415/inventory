@@ -42,7 +42,7 @@ def create_default_params():
               'days_until_cleaning': 30,
               'max_items_per_tote': 4,
               'max_washed_per_day': 5,
-              'n_totes_washed_start': 2}
+              'n_totes_washed_start': 1}
 
     return params
 
@@ -120,7 +120,7 @@ def create_schedule(pars=None, do_plot=True):
     n_washed_totes_available = pars['n_totes_washed_start'] \
         + cum_matrix*(n_totes_washed - n_totes_become_dirty)
 
-    # Minimize total cost
+    # Minimize total cost which is
     # sum of labor costs, storage costs and washing costs
 
     objective = Minimize(production.T*labor_costs +
