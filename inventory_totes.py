@@ -30,7 +30,7 @@ def create_default_params():
               'sales_sigma': 12.0,
               'inventory_max': 100.0,
               'inventory_start': 20.0,
-              'production_max': 103.0,
+              'production_max': 105.0,
               'sales_max': 110.0,
               'ramp': 1.0,
               'days_until_cleaning': 30,
