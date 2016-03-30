@@ -121,16 +121,16 @@ def create_schedule_totes(pars=None, do_plot=True):
     # Minimize total cost
     # sum of labor costs, storage costs and washing costs
 
-    objective = Minimize(production.T*labor_costs
-                         + pars['storage_cost']*sum(inventory)
-                         + pars['washing_tote_cost']*sum(n_totes_washed))
+    objective = Minimize(production.T*labor_costs +
+                         pars['storage_cost'] * sum(inventory) +
+                         pars['washing_tote_cost'] * sum(n_totes_washed))
 
     # Subject to these constraints
 
     # Inventory continuity equation
     derivative_matrix = mu.first_deriv_matrix(pars['n_days'])
     difference = production - sales
-    inventory_conservation = derivative_matrix * inventory == difference[:-1]
+    inventory_continuity = derivative_matrix * inventory == difference[:-1]
 
     # Have enough clean totes to hold all the inventory
 
@@ -142,7 +142,7 @@ def create_schedule_totes(pars=None, do_plot=True):
                    inventory <= pars['inventory_max'],
                    production >= 0,
                    production <= pars['production_max'],
-                   inventory_conservation,
+                   inventory_continuity,
                    inventory[0] == pars['inventory_start'],
                    n_totes_washed >= 0,
                    n_totes_washed <= pars['n_washed_max'],
@@ -177,12 +177,15 @@ def create_schedule_totes(pars=None, do_plot=True):
         plt.plot(days, production.value, label='production', marker='o')
         plt.plot(days, inventory.value, label='inventory')
         plt.plot(days, sales, label='sales', linestyle='--')
-        plt.plot(days, n_washed_totes_available.value, label='clean totes', linestyle='--')
+        plt.plot(days, n_washed_totes_available.value,
+                 label='clean totes', linestyle='--')
         plt.xlabel('Day')
         plt.title('Production Schedule: One product with totes')
         plt.legend()
         plt.xlim(-1, pars['n_days'] + 15)
-        y_max = 9 + max([max(production.value), max(inventory.value), max(sales)])
+        y_max = 9 + max([max(production.value),
+                         max(inventory.value),
+                         max(sales)])
         plt.ylim(-2, y_max)
         plt.show()
 
