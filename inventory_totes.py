@@ -1,125 +1,147 @@
+"""
+Code for demonstrating the optimization of a single
+product supply chain schedule with variable labor charges,
+inventory storage charges and the concept of totes.
+Totes are boxes holding a maximum number of products
+and require cleaning every 30 days at some cost with
+a maximum number of totes that can be cleaned in a single day.
+"""
+
 from cvxpy import Variable, Minimize, Problem
 import numpy as np
-import scipy
-import cvxopt
+import matrix_utils as mu
 from matplotlib import pylab as plt
 
-# one product, simplest supply chain
+try:
+    import seaborn
+except ImportError:
+    print 'seaborn not available'
+    pass
 
 
-def identity_spmatrix(n):
-    return cvxopt.spmatrix(1.0, range(n), range(n))
+def create_default_params():
+    params = {'n_days': 80,
+              'labor_cost': 1.0,
+              'labor_cost_extra_weekend': 0.5,
+              'storage_cost': 0.1,
+              'washing_tote_cost': 8.9,
+              'sales_base': 10.0,
+              'sales_random_seed': 42,
+              'sales_sigma': 12.0,
+              'inventory_max': 100.0,
+              'inventory_start': 20.0,
+              'production_max': 103.0,
+              'sales_max': 110.0,
+              'ramp': 1.0,
+              'days_until_cleaning': 30,
+              'max_items_per_tote': 4,
+              'n_washed_max': 5,
+              'n_totes_washed_start': 2}
+
+    return params
 
 
-def spmatrix2np(spmat):
+def create_sales(days, pars):
     """
-        Convert a matrix or spmatrix to numpy 2D array
-    :param spmat: matrix or spmatrix
-    :return: numpy 2D array of type float64
+    Create simulated sales
+    that are ramping up but saturate and have weekday
+    dependence and some (pseudo) randomness
+    :param days: index of days
+    :param pars: parameters, e.g. from create_default_params
+    :return: numpy array of sales for each day
     """
-    return np.asarray(cvxopt.matrix(spmat)).squeeze()
-
-
-def first_deriv_matrix(n):
-    # a matrix which computes the first derivative of a vector
-    # copied from examples on cvxpy page
-    e = np.mat(np.ones((1, n)))
-    D = scipy.sparse.spdiags(np.vstack((-e, e)), range(2), n-1, n)
-    D_coo = D.tocoo()
-    D = cvxopt.spmatrix(D_coo.data, D_coo.row.tolist(), D_coo.col.tolist())
-    return D
-
-
-def get_step_function_matrix(n):
-    """
-    Upper/lower triangular with all ones
-    Can be used for cumulative sum with matrix op
-    :param n:
-    :return:
-    """
-    step = identity_spmatrix(n)
-    for i in xrange(n):
-        for j in xrange(n):
-            if i >= j:
-                step[i, j] = 1.0
-    return step
-
-
-def get_time_shift_matrix(n, shift):
-    return cvxopt.spmatrix(1.0, shift+np.arange(n), np.arange(n))
-
-
-def create_schedule_totes(n_days=25):
-    # constants
-
-    #per unit costs
-    storage_cost = 0.1
-    labor_cost = 1.0
-    labor_cost_extra_weekend = 0.5
-
-    sales_base = 10.0
-    inventory_max = 70.0
-    inventory_start = 20.0
-    production_max = 90.0
-    sales_max = 100.0
-    ramp = 1.0
-    days_until_cleaning = 30
-
-    #totes
-
-    max_items_per_tote = 4
-    n_washed_max = 5
-    cost_washing_tote = 0.2
-    n_totes_washed_start = 2
-
-
-    # constant storage costs
-    storage_costs = np.repeat(storage_cost, n_days)
-
-    days = np.arange(n_days)
     weekday = days % 7
-
-    # labor costs are higher on the weekend
-    labor_costs = np.repeat(labor_cost, n_days) + (weekday > 4) * labor_cost_extra_weekend
-
-    # sales vary by weekday and are ramping up
     weekday_sales = np.array([1.0, 1.5, 1.8, 1.6, 1.9, 2.7, 3.5])
-    sales = np.repeat(sales_base, n_days) + weekday_sales[weekday] * ramp*days
-    sales = np.array([min(sale, sales_max) for sale in sales])
+    sales = np.repeat(pars['sales_base'], pars['n_days']) \
+        + weekday_sales[weekday] * pars['ramp']*days
+    sales = np.array([min(sale, pars['sales_max']) for sale in sales])
+    sales += np.random.randn(pars['n_days'])*pars['sales_sigma']
+    sales[sales < 0] = 0.0
+    return sales
 
-    # define variables
-    production = Variable(n_days)
-    inventory = Variable(n_days)
-    n_totes_washed = Variable(n_days)
 
-    # Conservation of inventory equation
-    D1 = first_deriv_matrix(n_days)
-    difference = production - sales
-    inventory_conservation = D1*inventory == difference[:-1]
+def get_labor_costs(days, pars):
+    """
+    Return labor costs per day which are higher on the weekend
+    :param days: numpy array of days
+    :param pars: parameters
+    :return: numpy array of labor costs per day
+    """
+    # labor costs are higher on the weekend
+    weekday = days % 7
+    labor_costs = np.repeat(pars['labor_cost'], pars['n_days']) \
+        + (weekday > 4) * pars['labor_cost_extra_weekend']
+    return labor_costs
 
-    cum_matrix = get_step_function_matrix(n_days)
-    cum_matrix_np = spmatrix2np(cum_matrix)
 
-    shift_matrix = get_time_shift_matrix(n_days, days_until_cleaning)
-    n_totes_become_dirty = (shift_matrix*n_totes_washed)[:n_days]
+def create_schedule_totes(pars=None, do_plot=True):
+    """
+    Demo an optimal supply chain scheduling with variable
+    labor costs, and the concept of totes that hold a number of
+    products. Totes need to be cleaned on a regular basis.
+    :param pars: parameters from create_default_params
+    :param do_plot: True if you want a plot created (default)
+    :return: None
+    """
+    if pars is None:
+        pars = create_default_params()
 
-    n_washed_totes_available = n_totes_washed_start \
-        + cum_matrix*n_totes_washed - n_totes_become_dirty
+    days = np.arange(pars['n_days'])
 
+    sales = create_sales(days, pars)
+    labor_costs = get_labor_costs(days, pars)
+
+    # define variables which keep track of
+    # production, inventory and number of totes washed per day
+
+    production = Variable(pars['n_days'])
+    inventory = Variable(pars['n_days'])
+    n_totes_washed = Variable(pars['n_days'])
+
+    # TODO: check these next few parts for off-by-one errors
+    # TODO: and that they are defined properly
+
+    # calculate when the totes that were washed become dirty again
+    shift_matrix = mu.get_time_shift_matrix(pars['n_days'],
+                                            pars['days_until_cleaning'])
+
+    n_totes_become_dirty = (shift_matrix*n_totes_washed)[:pars['n_days']]
+
+    # calculate the number of clean totes on any day
+    cum_matrix = mu.get_step_function_matrix(pars['n_days'])
+
+    n_washed_totes_available = pars['n_totes_washed_start'] \
+        + cum_matrix*(n_totes_washed - n_totes_become_dirty)
+
+    # Minimize total cost
+    # sum of labor costs, storage costs and washing costs
 
     objective = Minimize(production.T*labor_costs
-                         + inventory.T*storage_costs
-                         + cost_washing_tote*sum(n_totes_washed))
+                         + pars['storage_cost']*sum(inventory)
+                         + pars['washing_tote_cost']*sum(n_totes_washed))
+
+    # Subject to these constraints
+
+    # Inventory continuity equation
+    derivative_matrix = mu.first_deriv_matrix(pars['n_days'])
+    difference = production - sales
+    inventory_conservation = derivative_matrix * inventory == difference[:-1]
+
+    # Have enough clean totes to hold all the inventory
+
+    products_owned = inventory + production
+    have_enough_clean_totes = \
+        products_owned <= pars['max_items_per_tote']*n_washed_totes_available
 
     constraints = [inventory >= 0,
-                   inventory <= inventory_max,
+                   inventory <= pars['inventory_max'],
                    production >= 0,
-                   production <= production_max,
+                   production <= pars['production_max'],
                    inventory_conservation,
-                   inventory[0] == inventory_start,
+                   inventory[0] == pars['inventory_start'],
                    n_totes_washed >= 0,
-                   n_totes_washed <= n_washed_max,
-                   inventory < max_items_per_tote*n_washed_totes_available]
+                   n_totes_washed <= pars['n_washed_max'],
+                   have_enough_clean_totes]
 
     # define the problem and solve it
 
@@ -128,22 +150,38 @@ def create_schedule_totes(n_days=25):
 
     print "Status: %s" % problem.status
     if problem.status == 'infeasible':
+        print "Problem is infeasible, no solution found"
         return
 
-    print 'plotting'
-    #make plots
-    plt.clf()
-    plt.plot(days, production.value, label='production', marker='o')
-    plt.plot(days, inventory.value, label='inventory')
-    plt.plot(days, sales, label='sales', linestyle='--')
-    plt.plot(days, n_washed_totes_available.value, label='clean totes', linestyle='--')
-    plt.xlabel('Day')
-    plt.title('Production Schedule: One product')
-    plt.legend()
-    plt.show()
+    total_cost = problem.value
+    total_washing_cost = pars['washing_tote_cost']*sum(n_totes_washed.value)
+    total_labor_cost = (production.T*labor_costs).value
+    total_storage_cost = sum(inventory.value)*pars['storage_cost']
 
-    return problem
+    print "Total cost: %s" % total_cost
+    print "Total labor cost: %s" % total_labor_cost
+    print "Total washing cost: %s" % total_washing_cost
+    print "Total storage cost: %s" % total_storage_cost
+
+    # sanity check
+    sub_total = total_labor_cost + total_washing_cost + total_storage_cost
+    assert abs(total_cost - sub_total) < 1e-5
+
+    if do_plot:
+        plt.clf()
+        plt.plot(days, production.value, label='production', marker='o')
+        plt.plot(days, inventory.value, label='inventory')
+        plt.plot(days, sales, label='sales', linestyle='--')
+        plt.plot(days, n_washed_totes_available.value, label='clean totes', linestyle='--')
+        plt.xlabel('Day')
+        plt.title('Production Schedule: One product with totes')
+        plt.legend()
+        plt.xlim(-1, pars['n_days'] + 15)
+        y_max = 9 + max([max(production.value), max(inventory.value), max(sales)])
+        plt.ylim(-2, y_max)
+        plt.show()
+
 
 if __name__ == "__main__":
     print 'close window to finish'
-    create_schedule_totes(50)
+    create_schedule_totes()
