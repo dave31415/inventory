@@ -37,7 +37,7 @@ def first_deriv_matrix(n):
     return D
 
 
-def get_step_function_matrix(n):
+def get_cumulative_matrix(n):
     """
     Upper/lower triangular with all ones
     Can be used for cumulative sum with matrix op
