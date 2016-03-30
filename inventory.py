@@ -79,7 +79,7 @@ def get_labor_costs(days, pars):
     return labor_costs
 
 
-def create_schedule_totes(pars=None, do_plot=True):
+def create_schedule(pars=None, do_plot=True):
     """
     Demo an optimal supply chain scheduling with variable
     labor costs, and the concept of totes that hold a number of
@@ -192,4 +192,4 @@ def create_schedule_totes(pars=None, do_plot=True):
 
 if __name__ == "__main__":
     print 'close window to finish'
-    create_schedule_totes()
+    create_schedule()
