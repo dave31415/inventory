@@ -22,6 +22,8 @@ except ImportError:
 def create_default_params():
     """
     Create the default parameters for the demo
+    Warning: if you change these it may result
+    in an infeasible solution so choose them wisely
     :return: dictionary of all parameters needed
     """
     params = {'n_days': 80,
