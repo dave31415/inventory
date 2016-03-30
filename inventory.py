@@ -107,13 +107,13 @@ def create_schedule_totes(pars=None, do_plot=True):
     # TODO: and that they are defined properly
 
     # calculate when the totes that were washed become dirty again
-    shift_matrix = mu.get_time_shift_matrix(pars['n_days'],
+    shift_matrix = mu.time_shift_matrix(pars['n_days'],
                                             pars['days_until_cleaning'])
 
     n_totes_become_dirty = (shift_matrix*n_totes_washed)[:pars['n_days']]
 
     # calculate the number of clean totes on any day
-    cum_matrix = mu.get_cumulative_matrix(pars['n_days'])
+    cum_matrix = mu.cumulative_matrix(pars['n_days'])
 
     n_washed_totes_available = pars['n_totes_washed_start'] \
         + cum_matrix*(n_totes_washed - n_totes_become_dirty)

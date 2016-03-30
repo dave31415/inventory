@@ -37,7 +37,7 @@ def first_deriv_matrix(n):
     return D
 
 
-def get_cumulative_matrix(n):
+def cumulative_matrix(n):
     """
     Upper/lower triangular with all ones
     Can be used for cumulative sum with matrix op
@@ -52,7 +52,7 @@ def get_cumulative_matrix(n):
     return step
 
 
-def get_time_shift_matrix(n, shift):
+def time_shift_matrix(n, shift):
     """
     Returns a matrix which when multiplied by a vector
     shifts it to the right by some number of indices
