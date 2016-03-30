@@ -32,16 +32,16 @@ def create_default_params():
               'storage_cost': 0.1,
               'washing_tote_cost': 8.9,
               'sales_base': 10.0,
+              'sales_ramp': 1.0,
               'sales_random_seed': 42,
               'sales_sigma': 12.0,
-              'inventory_max': 100.0,
-              'inventory_start': 20.0,
-              'production_max': 105.0,
               'sales_max': 110.0,
-              'ramp': 1.0,
+              'inventory_start': 20.0,
+              'inventory_max': 100.0,
+              'production_max': 105.0,
               'days_until_cleaning': 30,
               'max_items_per_tote': 4,
-              'n_washed_max': 5,
+              'max_washed_per_day': 5,
               'n_totes_washed_start': 2}
 
     return params
@@ -59,7 +59,7 @@ def create_sales(days, pars):
     weekday = days % 7
     weekday_sales = np.array([1.0, 1.5, 1.8, 1.6, 1.9, 2.7, 3.5])
     sales = np.repeat(pars['sales_base'], pars['n_days']) \
-        + weekday_sales[weekday] * pars['ramp']*days
+        + weekday_sales[weekday] * pars['sales_ramp']*days
     sales = np.array([min(sale, pars['sales_max']) for sale in sales])
     np.random.seed(pars['sales_random_seed'])
     sales += np.random.randn(pars['n_days'])*pars['sales_sigma']
@@ -147,7 +147,7 @@ def create_schedule(pars=None, do_plot=True):
                    inventory_continuity,
                    inventory[0] == pars['inventory_start'],
                    n_totes_washed >= 0,
-                   n_totes_washed <= pars['n_washed_max'],
+                   n_totes_washed <= pars['max_washed_per_day'],
                    have_enough_clean_totes]
 
     # define the problem and solve it
