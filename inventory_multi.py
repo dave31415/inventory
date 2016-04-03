@@ -127,10 +127,10 @@ def create_schedule(pars=None, do_plot=True):
     if pars is None:
         pars = create_default_params()
 
+    print pars['n_days']
+
     product_costs = create_product_line_costs()
     n_product_lines, n_products, = len(product_costs), len(product_costs[0])
-
-    days = np.arange(pars['n_days'])
 
     sales = np.zeros((pars['n_days'], n_products))
     for product_num in xrange(n_products):
@@ -246,4 +246,6 @@ def create_schedule(pars=None, do_plot=True):
 
 if __name__ == "__main__":
     print 'close window to finish'
-    create_schedule()
+    pars = create_default_params()
+    pars['n_days'] = 300
+    create_schedule(pars=pars)

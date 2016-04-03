@@ -44,12 +44,15 @@ def cumulative_matrix(n):
     :param n:
     :return:
     """
-    step = identity_spmatrix(n)
+    x = []
+    y = []
     for i in xrange(n):
-        for j in xrange(n):
-            if i >= j:
-                step[i, j] = 1.0
+        for j in xrange(i+1):
+            x.append(i)
+            y.append(j)
+    step = cvxopt.spmatrix(1.0, x, y)
     return step
+
 
 
 def time_shift_matrix(n, shift):

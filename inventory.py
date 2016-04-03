@@ -7,10 +7,13 @@ and require cleaning every 30 days at some cost with
 a maximum number of totes that can be cleaned in a single day.
 """
 
-from cvxpy import Variable, Minimize, Problem, Maximize
+from cvxpy import Variable, Maximize, Problem
 import numpy as np
 import matrix_utils as mu
 from matplotlib import pylab as plt
+from time import time
+import epopt
+
 
 try:
     import seaborn
@@ -30,7 +33,7 @@ def create_default_params():
               'labor_cost': 1.0,
               'labor_cost_extra_weekend': 0.5,
               'storage_cost': 0.05,
-              'washing_tote_cost': 8.9,
+              'washing_tote_cost': 18.9,
               'demand_base': 10.0,
               'demand_ramp': 1.0,
               'demand_random_seed': 42,
@@ -38,12 +41,14 @@ def create_default_params():
               'demand_max': 110.0,
               'inventory_start': 20.0,
               'inventory_max': 100.0,
-              'production_max': 105.0,
+              'production_max': 157.0,
               'days_until_cleaning': 30,
               'max_items_per_tote': 4,
               'max_washed_per_day': 5,
               'n_totes_washed_start': 1,
-              'sales_price': 1.60}
+              'sales_price': 1.60,
+              'use_epsilon_solver': False,
+              'verbose': True}
 
     return params
 
@@ -58,14 +63,16 @@ def create_demand(days, pars):
     :return: numpy array of sales for each day
     """
     weekday = days % 7
-    weekday_sales = np.array([1.0, 1.5, 1.8, 1.6, 1.9, 2.7, 3.5])
-    sales = np.repeat(pars['demand_base'], pars['n_days']) \
-        + weekday_sales[weekday] * pars['demand_ramp']*days
-    sales = np.array([min(sale, pars['demand_max']) for sale in sales])
+    weekday_demand = np.array([1.0, 1.5, 1.8, 1.6, 1.9, 2.7, 3.5])
+    demand = np.repeat(pars['demand_base'], pars['n_days']) \
+        + weekday_demand[weekday] * pars['demand_ramp']*days
+    demand = np.array([min(sale, pars['demand_max']) for sale in demand])
     np.random.seed(pars['demand_random_seed'])
-    sales += np.random.randn(pars['n_days'])*pars['demand_sigma']
-    sales[sales < 0] = 0.0
-    return sales
+    demand += np.random.randn(pars['n_days'])*pars['demand_sigma']
+    demand += 70.5*(np.sin(2*np.pi*days/365.0)**2)
+
+    demand[demand < 0] = 0.0
+    return demand
 
 
 def get_labor_costs(days, pars):
@@ -96,17 +103,20 @@ def create_schedule(pars=None, do_plot=True):
 
     days = np.arange(pars['n_days'])
 
+    print 'creating demand'
     demand = create_demand(days, pars)
     labor_costs = get_labor_costs(days, pars)
 
     # define variables which keep track of
     # production, inventory and number of totes washed per day
 
+    print 'defining variables'
     production = Variable(pars['n_days'])
     sales = Variable(pars['n_days'])
     inventory = Variable(pars['n_days'])
     n_totes_washed = Variable(pars['n_days'])
 
+    print 'calculating costs and profit'
     # calculate when the totes that were washed become dirty again
     shift_matrix = mu.time_shift_matrix(pars['n_days'],
                                             pars['days_until_cleaning'])
@@ -119,6 +129,8 @@ def create_schedule(pars=None, do_plot=True):
     n_washed_totes_available = pars['n_totes_washed_start'] \
         + cum_matrix*(n_totes_washed - n_totes_become_dirty)
 
+    print 'calculating total cost'
+
     # Minimize total cost which is
     # sum of labor costs, storage costs and washing costs
 
@@ -128,6 +140,7 @@ def create_schedule(pars=None, do_plot=True):
 
     total_profit = pars['sales_price']*sum(sales)-total_cost
 
+    print 'defining objective'
     objective = Maximize(total_profit)
 
     # Subject to these constraints
@@ -158,7 +171,21 @@ def create_schedule(pars=None, do_plot=True):
     # define the problem and solve it
 
     problem = Problem(objective, constraints)
-    problem.solve(verbose=True)
+
+    solver = 'cvxpy'
+    if pars['use_epsilon_solver']:
+        solver = 'epsilon'
+
+    print 'solving with: %s' % solver
+    start = time()
+    if not pars['use_epsilon_solver']:
+        problem.solve(verbose=pars['verbose'])
+    else:
+        epopt.solve(problem, verbose=pars['verbose'])
+
+    finish = time()
+    run_time = finish - start
+    print 'Solve time: %s seconds' % run_time
 
     print "Status: %s" % problem.status
     if problem.status == 'infeasible':
@@ -198,6 +225,31 @@ def create_schedule(pars=None, do_plot=True):
         plt.show()
 
 
-if __name__ == "__main__":
+def run():
+    """
+    Run the pipeline
+    :return: None
+    """
     print 'close window to finish'
-    create_schedule()
+    start = time()
+    pars = create_default_params()
+    pars['n_days'] = 500
+    create_schedule(pars=pars, do_plot=False)
+    finish = time()
+    run_time = finish - start
+    print 'total time: %s seconds' % run_time
+
+
+def epsilon_failing():
+    pars = create_default_params()
+    pars['use_epsilon_solver'] = False
+    create_schedule(pars=pars, do_plot=False)
+    print 'cxvpy succeeded'
+    pars['use_epsilon_solver'] = True
+    create_schedule(pars=pars, do_plot=False)
+    print 'epsilon succeeded'
+
+
+if __name__ == "__main__":
+    run()
+    # epsilon_failing()
