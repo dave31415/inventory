@@ -12,8 +12,6 @@ import numpy as np
 import matrix_utils as mu
 from matplotlib import pylab as plt
 from time import time
-import epopt
-
 
 try:
     import seaborn
@@ -90,6 +88,75 @@ def get_labor_costs(days, pars):
     return labor_costs
 
 
+def make_constraints(production, sales, inventory, pars,
+                     n_washed_totes_available, n_totes_washed, demand):
+    """
+    :param production: production cvxpy Variable
+    :param sales: sales cvxpy Variable
+    :param inventory: inventory cvxpy Variable
+    :param pars: parameters
+    :param n_washed_totes_available: washed totes available on any day cvxpy Variable
+    :param n_totes_washed: n_totes_washed on any day cvxpy Variable
+    :param demand: demand cvxpy Variable
+    :return:
+    """
+    # Inventory continuity equation
+    derivative_matrix = mu.first_deriv_matrix(pars['n_days'])
+    difference = production - sales
+    inventory_continuity = derivative_matrix * inventory == difference[:-1]
+
+    # Have enough clean totes to hold all the inventory
+
+    products_owned = inventory + production
+    have_enough_clean_totes = \
+        products_owned <= pars['max_items_per_tote']*n_washed_totes_available
+
+    constraints = [inventory >= 0,
+                   inventory <= pars['inventory_max'],
+                   production >= 0,
+                   production <= pars['production_max'],
+                   inventory_continuity,
+                   inventory[0] == pars['inventory_start'],
+                   n_totes_washed >= 0,
+                   n_totes_washed <= pars['max_washed_per_day'],
+                   have_enough_clean_totes,
+                   sales > 0,
+                   sales <= demand]
+
+    return constraints
+
+
+def plot_variables(pars, days, production, inventory, sales, demand,
+                   n_washed_totes_available):
+    """
+    Plot the result
+    :param pars:
+    :param days:
+    :param production:
+    :param inventory:
+    :param sales:
+    :param demand:
+    :param n_washed_totes_available:
+    :return:
+    """
+    plt.clf()
+    plt.plot(days, production.value, label='production', marker='o')
+    plt.plot(days, inventory.value, label='inventory')
+    plt.plot(days, sales.value, label='sales', linestyle='-')
+    plt.plot(days, demand, label='demand', linestyle='--')
+    plt.plot(days, n_washed_totes_available.value,
+             label='clean totes', linestyle='--')
+    plt.xlabel('Day')
+    plt.title('Production Schedule: One product with totes')
+    plt.legend()
+    plt.xlim(-1, pars['n_days'] + 15)
+    y_max = 9 + max([max(production.value),
+                     max(inventory.value),
+                     max(demand)])
+    plt.ylim(-2, y_max)
+    plt.show()
+
+
 def create_schedule(pars=None):
     """
     Demo an optimal supply chain scheduling with variable
@@ -146,28 +213,9 @@ def create_schedule(pars=None):
 
     # Subject to these constraints
 
-    # Inventory continuity equation
-    derivative_matrix = mu.first_deriv_matrix(pars['n_days'])
-    difference = production - sales
-    inventory_continuity = derivative_matrix * inventory == difference[:-1]
-
-    # Have enough clean totes to hold all the inventory
-
-    products_owned = inventory + production
-    have_enough_clean_totes = \
-        products_owned <= pars['max_items_per_tote']*n_washed_totes_available
-
-    constraints = [inventory >= 0,
-                   inventory <= pars['inventory_max'],
-                   production >= 0,
-                   production <= pars['production_max'],
-                   inventory_continuity,
-                   inventory[0] == pars['inventory_start'],
-                   n_totes_washed >= 0,
-                   n_totes_washed <= pars['max_washed_per_day'],
-                   have_enough_clean_totes,
-                   sales > 0,
-                   sales <= demand]
+    constraints = make_constraints(production, sales, inventory, pars,
+                                   n_washed_totes_available,
+                                   n_totes_washed, demand)
 
     # define the problem and solve it
 
@@ -182,6 +230,7 @@ def create_schedule(pars=None):
     if not pars['use_epsilon_solver']:
         problem.solve(verbose=pars['verbose'])
     else:
+        import epopt
         epopt.solve(problem, verbose=pars['verbose'])
 
     finish = time()
@@ -208,22 +257,9 @@ def create_schedule(pars=None):
     print "Total profit: %s" % total_profit.value
 
     if pars['do_plot']:
+        plot_variables(pars, days, production, inventory, sales, demand,
+                       n_washed_totes_available)
         plt.clf()
-        plt.plot(days, production.value, label='production', marker='o')
-        plt.plot(days, inventory.value, label='inventory')
-        plt.plot(days, sales.value, label='sales', linestyle='-')
-        plt.plot(days, demand, label='demand', linestyle='--')
-        plt.plot(days, n_washed_totes_available.value,
-                 label='clean totes', linestyle='--')
-        plt.xlabel('Day')
-        plt.title('Production Schedule: One product with totes')
-        plt.legend()
-        plt.xlim(-1, pars['n_days'] + 15)
-        y_max = 9 + max([max(production.value),
-                         max(inventory.value),
-                         max(demand)])
-        plt.ylim(-2, y_max)
-        plt.show()
 
 
 def run():
@@ -242,6 +278,11 @@ def run():
 
 
 def epsilon_failing():
+    """
+    A failing test example
+    Can't get epsilon solver to work yet
+    :return:
+    """
     pars = create_default_params()
     pars['use_epsilon_solver'] = False
     create_schedule(pars=pars)
