@@ -48,6 +48,7 @@ def create_default_params():
               'n_totes_washed_start': 1,
               'sales_price': 1.60,
               'use_epsilon_solver': False,
+              'do_plot': True,
               'verbose': True}
 
     return params
@@ -89,7 +90,7 @@ def get_labor_costs(days, pars):
     return labor_costs
 
 
-def create_schedule(pars=None, do_plot=True):
+def create_schedule(pars=None):
     """
     Demo an optimal supply chain scheduling with variable
     labor costs, and the concept of totes that hold a number of
@@ -206,7 +207,7 @@ def create_schedule(pars=None, do_plot=True):
     print "Total cost/item: %s" % total_cost_per_item
     print "Total profit: %s" % total_profit.value
 
-    if do_plot:
+    if pars['do_plot']:
         plt.clf()
         plt.plot(days, production.value, label='production', marker='o')
         plt.plot(days, inventory.value, label='inventory')
@@ -234,7 +235,7 @@ def run():
     start = time()
     pars = create_default_params()
     pars['n_days'] = 500
-    create_schedule(pars=pars, do_plot=False)
+    create_schedule(pars=pars)
     finish = time()
     run_time = finish - start
     print 'total time: %s seconds' % run_time
@@ -243,10 +244,10 @@ def run():
 def epsilon_failing():
     pars = create_default_params()
     pars['use_epsilon_solver'] = False
-    create_schedule(pars=pars, do_plot=False)
+    create_schedule(pars=pars)
     print 'cxvpy succeeded'
     pars['use_epsilon_solver'] = True
-    create_schedule(pars=pars, do_plot=False)
+    create_schedule(pars=pars)
     print 'epsilon succeeded'
 
 
