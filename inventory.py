@@ -27,7 +27,7 @@ def create_default_params():
     in an infeasible solution so choose them wisely
     :return: dictionary of all parameters needed
     """
-    params = {'n_days': 80,
+    params = {'n_days': 200,
               'labor_cost': 1.0,
               'labor_cost_extra_weekend': 0.5,
               'storage_cost': 0.05,
@@ -270,7 +270,6 @@ def run():
     print 'close window to finish'
     start = time()
     pars = create_default_params()
-    pars['n_days'] = 500
     create_schedule(pars=pars)
     finish = time()
     run_time = finish - start
