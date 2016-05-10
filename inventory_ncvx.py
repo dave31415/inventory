@@ -5,9 +5,11 @@ inventory storage charges and the concept of totes.
 Totes are boxes holding a maximum number of products
 and require cleaning every 30 days at some cost with
 a maximum number of totes that can be cleaned in a single day.
+This version uses ncvx
 """
 
 from cvxpy import Variable, Maximize, Problem
+from ncvx import Boolean, Integer
 import numpy as np
 from matplotlib import pylab as plt
 from time import time
@@ -156,7 +158,9 @@ def create_schedule(n_days, inventory_start,
     print 'defining variables'
     production = Variable(n_days)
     sales = Variable(n_days)
-    inventory = Variable(n_days)
+    #inventory = Variable(n_days)
+    inventory = Integer(n_days, M=100000)
+    print 'here'
     n_totes_washed = Variable(n_days)
 
     print 'calculating costs and profit'

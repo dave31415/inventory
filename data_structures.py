@@ -18,6 +18,11 @@ line_schedule = [{'line_number': 1,
 # We either need to find a product which does this out of the box
 # Or we need to create this
 
+product = {'product_name': 'joy_12oz', 'sales_price': 1.0}
+
+production_line = {'production_line_name': 'Line_47',
+                   'product_run_rate_cost': {'joy_12oz': 1.0, 'ivory_24oz': 5.0}}
+
 
 def cost_function(line_schedule, plant_parameters, constraints):
     """
